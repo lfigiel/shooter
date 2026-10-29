@@ -12,18 +12,39 @@ class Player:
         self.width = self.texture.width
         self.height = self.texture.height
         self.name = name
+        self.hit = False
+        self.hit_timer = 0
+        self.tint_color = WHITE
 
     def __del__(self):
         # This acts as the destructor
         unload_texture(self.texture)
 
-    def draw(self, tint_color: Color):
+    def draw(self):
         draw_texture_pro(self.texture,
                          (0, 0, self.width, self.height),
                          (self.x + self.width/2, self.y + self.height/2, self.width, self.height),
                          (self.width/2, self.height/2),
                          self.angle,
-                         tint_color)
+                         self.tint_color)
+
+class Bullet:
+    def __init__(self, x, y, angle):
+        self.x = x
+        self.y = y
+        self.angle = angle
+        self.speed = 10
+        self.radius = 5
+        self.is_alive = True  # Flag to handle collision-based death
+        print("New Bullet")
+
+    def update(self):
+        # Move the bullet upward
+        self.x += math.sin(math.radians(self.angle)) * self.speed
+        self.y -= math.cos(math.radians(self.angle)) * self.speed
+
+    def draw(self):
+        draw_circle(int(self.x), int(self.y), self.radius, RED)
 
 class App:
 
@@ -50,13 +71,15 @@ class App:
         # NOTE: Textures must always be loaded AFTER init_window()
         self.bg_texture = load_texture("assets/background.png")
 
+        # Bullets
+        self.bullets = []
+
         # Music and sound
         init_audio_device()
         self.bg_music = load_music_stream("assets/music.mp3")
         play_music_stream(self.bg_music)
         self.explosion = load_sound("assets/explosion.mp3")
         self.explosion_playing = False
-
 
     def input(self):
         # --- 1. KEYBOARD INPUT & MOVEMENT ---
@@ -74,7 +97,11 @@ class App:
             self.player1.angle += self.speed
             if self.player1.angle > 360:
                 self.player1.angle = 0
-        
+
+        # 1. SPAWN: Add bullet when player shoots
+        if is_key_pressed(KEY_SPACE):
+            self.bullets.append(Bullet(self.player1.x + self.player1.width/2, self.player1.y + self.player1.height/2, self.player1.angle))
+
         # player2 controls (Arrow Keys)
         if is_key_down(KEY_UP):
             pass
@@ -114,10 +141,42 @@ class App:
         
         # Determine tint color based on collision status
         # Raylib overlays tints: WHITE leaves asset normal; RED filters it completely red
-        if self.is_colliding:
-            self.tint_color = RED
+        if self.is_colliding or self.player1.hit:
+            self.player1.tint_color = RED
         else:
-            self.tint_color = WHITE
+            self.player1.tint_color = WHITE
+
+        if self.player1.hit and self.player1.hit_timer <= get_time():
+            self.player1.hit = False
+
+        if self.is_colliding or self.player2.hit:
+            self.player2.tint_color = RED
+        else:
+            self.player2.tint_color = WHITE
+
+        if self.player2.hit and self.player2.hit_timer <= get_time():
+            self.player2.hit = False
+
+
+        # 2. UPDATE: Move and update logic for all bullets
+        for bullet in self.bullets:
+            bullet.update()
+
+            if check_collision_circle_rec((bullet.x, bullet.y), float(bullet.radius), rec2):
+                play_sound(self.explosion)  # Plays the sound effect
+                self.player2.hit_timer = get_time() + 0.1
+                self.player2.hit = True
+                bullet.is_alive = False
+                continue
+
+            # Check if off-screen (disappearance condition)
+            if bullet.x < 0 or bullet.x > get_screen_width() or \
+              bullet.y < 0 or bullet.y > get_screen_height():
+                bullet.is_alive = False
+
+        # Remove dead/off-screen bullets
+        # Rebuilds the list with only active bullets, avoiding mid-loop index errors
+        self.bullets = [b for b in self.bullets if b.is_alive]
 
     def render(self):
 
@@ -153,11 +212,14 @@ class App:
             self.explosion_playing = False
             
         # Draw players at their bounding box X and Y positions with the dynamic tint
-        self.player1.draw(self.tint_color)
-        self.player2.draw(self.tint_color)
-        
-        end_drawing()
+        self.player1.draw()
+        self.player2.draw()
 
+        # Bullets
+        for bullet in self.bullets:
+            bullet.draw()
+
+        end_drawing()
 
     def run(self):
 
@@ -166,7 +228,7 @@ class App:
         # Main Game Loop
         while not window_should_close():
             # Movement speed
-            self.speed =  200 * get_frame_time()
+            self.speed =  10 * get_frame_time()
             self.input()
             self.process()
             self.render()
