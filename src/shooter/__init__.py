@@ -2,6 +2,9 @@ from pyray import *
 import math
 import sys
 
+SPEED = 200
+BULLET_DAMAGE = 5
+
 class Player:
 
     def __init__(self, x: float, y: float, angle: float, tex_file: str, name: str):
@@ -12,6 +15,7 @@ class Player:
         self.width = self.texture.width
         self.height = self.texture.height
         self.name = name
+        self.health = 100
         self.hit = False
         self.hit_timer = 0
         self.tint_color = WHITE
@@ -29,14 +33,15 @@ class Player:
                          self.tint_color)
 
 class Bullet:
-    def __init__(self, x, y, angle):
+    def __init__(self, x, y, angle, shooter):
         self.x = x
         self.y = y
         self.angle = angle
         self.speed = 10
         self.radius = 5
+        self.damage = BULLET_DAMAGE
+        self.shooter = shooter
         self.is_alive = True  # Flag to handle collision-based death
-        print("New Bullet")
 
     def update(self):
         # Move the bullet upward
@@ -60,15 +65,15 @@ class App:
         set_target_fps(60)
 
         # Players init
-        self.player1 = Player(0, 0, 0, "assets/ship1.png", self.player1_name)
-        self.player1.y = float(get_screen_height() - self.player1.height)
+        self.players = []
+        self.players.append(Player(0, 0, 0, "assets/ship1.png", self.player1_name))
+        self.players[0].y = float(get_screen_height() - self.players[0].height)
 
-        self.player2 = Player(0, 0, 0, "assets/ship2.png", self.player2_name)
-        self.player2.x = float(get_screen_width() - self.player2.width)
-        self.player2.y = float(get_screen_height() - self.player2.height)
+        self.players.append(Player(0, 0, 0, "assets/ship2.png", self.player2_name))
+        self.players[1].x = float(get_screen_width() - self.players[1].width)
+        self.players[1].y = float(get_screen_height() - self.players[1].height)
 
-        # Load textures from PNG files
-        # NOTE: Textures must always be loaded AFTER init_window()
+        # Background
         self.bg_texture = load_texture("assets/background.png")
 
         # Bullets
@@ -79,28 +84,40 @@ class App:
         self.bg_music = load_music_stream("assets/music.mp3")
         play_music_stream(self.bg_music)
         self.explosion = load_sound("assets/explosion.mp3")
-        self.explosion_playing = False
+        self.shot = load_sound("assets/shot.mp3")
+        self.game_over = False
+        self.play = True
 
     def input(self):
         # --- 1. KEYBOARD INPUT & MOVEMENT ---
-        
+
+        if self.game_over:
+            if is_key_pressed(KEY_SPACE): 
+                self.play = False
+            return
+
         # player1 controls (W, A, S, D)
         if is_key_down(KEY_W): 
             pass
         if is_key_down(KEY_S):
             pass
         if is_key_down(KEY_A):
-            self.player1.angle -= self.speed
-            if self.player1.angle < 0:
-                self.player1.angle += 360
+            self.players[0].angle -= self.speed
+            if self.players[0].angle < 0:
+                self.players[0].angle += 360
         if is_key_down(KEY_D):
-            self.player1.angle += self.speed
-            if self.player1.angle > 360:
-                self.player1.angle = 0
+            self.players[0].angle += self.speed
+            if self.players[0].angle > 360:
+                self.players[0].angle = 0
 
-        # 1. SPAWN: Add bullet when player shoots
-        if is_key_pressed(KEY_SPACE):
-            self.bullets.append(Bullet(self.player1.x + self.player1.width/2, self.player1.y + self.player1.height/2, self.player1.angle))
+        # Add bullet when player shoots
+        if is_key_pressed(KEY_LEFT_ALT):
+            self.bullets.append(Bullet(self.players[0].x + self.players[0].width/2,
+                                       self.players[0].y + self.players[0].height/2,
+                                       self.players[0].angle,
+                                       0))
+            play_sound(self.shot)  # Plays the sound effect
+
 
         # player2 controls (Arrow Keys)
         if is_key_down(KEY_UP):
@@ -108,66 +125,88 @@ class App:
         if is_key_down(KEY_DOWN):
             pass
         if is_key_down(KEY_LEFT):
-            self.player2.angle -= self.speed
-            if self.player2.angle < 0:
-                self.player2.angle += 360
+            self.players[1].angle -= self.speed
+            if self.players[1].angle < 0:
+                self.players[1].angle += 360
         if is_key_down(KEY_RIGHT):
-            self.player2.angle += self.speed
-            if self.player2.angle > 360:
-                self.player2.angle = 0
+            self.players[1].angle += self.speed
+            if self.players[1].angle > 360:
+                self.players[1].angle = 0
+
+        # Add bullet when player shoots
+        if is_key_pressed(KEY_RIGHT_ALT):
+            self.bullets.append(Bullet(self.players[1].x + self.players[1].width/2,
+                                       self.players[1].y + self.players[1].height/2,
+                                       self.players[1].angle,
+                                       1))
+            play_sound(self.shot)  # Plays the sound effect
 
     def process(self):
-        self.player1.x += math.sin(math.radians(self.player1.angle)) * self.speed
-        self.player1.x = max(self.player1.x, 0)
-        self.player1.x = min(self.player1.x, get_screen_width() - self.player1.width)
+        if self.game_over:
+            return
 
-        self.player1.y -= math.cos(math.radians(self.player1.angle)) * self.speed
-        self.player1.y = max(self.player1.y, 0)
-        self.player1.y = min(self.player1.y, get_screen_height() - self.player1.height)
+        self.players[0].x += math.sin(math.radians(self.players[0].angle)) * self.speed
+        self.players[0].x = max(self.players[0].x, 0)
+        self.players[0].x = min(self.players[0].x, get_screen_width() - self.players[0].width)
 
-        self.player2.x += math.sin(math.radians(self.player2.angle)) * self.speed
-        self.player2.x = max(self.player2.x, 0)
-        self.player2.x = min(self.player2.x, get_screen_width() - self.player2.width)
+        self.players[0].y -= math.cos(math.radians(self.players[0].angle)) * self.speed
+        self.players[0].y = max(self.players[0].y, 0)
+        self.players[0].y = min(self.players[0].y, get_screen_height() - self.players[0].height)
 
-        self.player2.y -= math.cos(math.radians(self.player2.angle)) * self.speed
-        self.player2.y = max(self.player2.y, 0)
-        self.player2.y = min(self.player2.y, get_screen_height() - self.player2.height)
+        self.players[1].x += math.sin(math.radians(self.players[1].angle)) * self.speed
+        self.players[1].x = max(self.players[1].x, 0)
+        self.players[1].x = min(self.players[1].x, get_screen_width() - self.players[1].width)
+
+        self.players[1].y -= math.cos(math.radians(self.players[1].angle)) * self.speed
+        self.players[1].y = max(self.players[1].y, 0)
+        self.players[1].y = min(self.players[1].y, get_screen_height() - self.players[1].height)
 
         # --- 2. COLLISION DETECTION ---
         # Check if the two bounding rectangles overlap
-        rec1 = Rectangle(self.player1.x, self.player1.y, self.player1.width, self.player1.height)
-        rec2 = Rectangle(self.player2.x, self.player2.y, self.player2.width, self.player2.height)
-        self.is_colliding = check_collision_recs(rec1, rec2)
-        
-        # Determine tint color based on collision status
+        rec1 = Rectangle(self.players[0].x, self.players[0].y, self.players[0].width, self.players[0].height)
+        rec2 = Rectangle(self.players[1].x, self.players[1].y, self.players[1].width, self.players[1].height)
+
+        if check_collision_recs(rec1, rec2):
+            if not self.is_colliding:
+                play_sound(self.explosion)  # Plays the sound effect
+                self.is_colliding = True
+        else:
+            self.is_colliding = False
+
+        # Determine tint color based on collision or hit status
         # Raylib overlays tints: WHITE leaves asset normal; RED filters it completely red
-        if self.is_colliding or self.player1.hit:
-            self.player1.tint_color = RED
-        else:
-            self.player1.tint_color = WHITE
+        for player in self.players:
+            if self.is_colliding or player.hit:
+                player.tint_color = RED
+            else:
+                player.tint_color = WHITE
 
-        if self.player1.hit and self.player1.hit_timer <= get_time():
-            self.player1.hit = False
-
-        if self.is_colliding or self.player2.hit:
-            self.player2.tint_color = RED
-        else:
-            self.player2.tint_color = WHITE
-
-        if self.player2.hit and self.player2.hit_timer <= get_time():
-            self.player2.hit = False
-
+            if player.hit and player.hit_timer <= get_time():
+                player.hit = False
 
         # 2. UPDATE: Move and update logic for all bullets
         for bullet in self.bullets:
             bullet.update()
 
-            if check_collision_circle_rec((bullet.x, bullet.y), float(bullet.radius), rec2):
-                play_sound(self.explosion)  # Plays the sound effect
-                self.player2.hit_timer = get_time() + 0.1
-                self.player2.hit = True
-                bullet.is_alive = False
-                continue
+            i = 0 #player index
+            for player in self.players:
+                if bullet.shooter == i:
+                    i =+ 1
+                    continue
+                if check_collision_circle_rec((bullet.x, bullet.y),
+                                              float(bullet.radius),
+                                              (player.x, player.y,
+                                               player.width, player.height)):
+                    play_sound(self.explosion)  # Plays the sound effect
+                    player.hit_timer = get_time() + 0.1
+                    player.hit = True
+                    player.health -= bullet.damage
+                    if player.health <= 0:
+                        player.health = 0
+                        self.game_over = True
+                    bullet.is_alive = False
+                    continue
+                i += 1
 
             # Check if off-screen (disappearance condition)
             if bullet.x < 0 or bullet.x > get_screen_width() or \
@@ -177,6 +216,12 @@ class App:
         # Remove dead/off-screen bullets
         # Rebuilds the list with only active bullets, avoiding mid-loop index errors
         self.bullets = [b for b in self.bullets if b.is_alive]
+
+    def health_color(self, health) -> Color:
+        if health <= 20:
+            return RED
+        else:
+            return DARKGRAY
 
     def render(self):
 
@@ -193,31 +238,59 @@ class App:
                         WHITE)
         
         # Draw instructions on the screen
-        draw_text(f"{self.player1.name} (Left): W, A, S, D", 10, 10, 20, DARKGRAY)
-        t = self.player2.name + " (Right): Arrow Keys"
+        draw_text(f"{self.players[0].name} (Left): W, A, S, D", 10, 10, 20, DARKGRAY)
+        draw_text(f"Health: {self.players[0].health}",
+                  10,
+                  40,
+                  20,
+                  self.health_color(self.players[0].health))
+
+        t = self.players[1].name + " (Right): Arrow Keys"
         text_size = measure_text(t, 20)
         draw_text(t, get_screen_width() - text_size - 10, 10, 20, DARKGRAY)
+        draw_text(f"Health: {self.players[1].health}",
+                  get_screen_width() - text_size - 10,
+                  40,
+                  20,
+                  self.health_color(self.players[1].health))
 
-        draw_fps(10, 50)
+        draw_fps(10, 70)
+
+        if self.game_over:
+            t = "GAME OVER"
+            text_size = measure_text(t, 40)
+            text_y = int(get_screen_height()/2) - 60
+            draw_text(t, int((get_screen_width() - text_size)/2), text_y, 40, RED)
+
+            for player in self.players:
+                if player.health > 0:
+                    t = player.name + " wins !"
+                    text_size = measure_text(t, 20)
+                    text_y += 60
+                    draw_text(t, int((get_screen_width() - text_size)/2), text_y, 20, DARKGRAY)
+                    break
+
+            t = "Press SPACE to exit"
+            text_size = measure_text(t, 20)
+            text_y += 40
+            draw_text(t, int((get_screen_width() - text_size)/2), text_y, 20, DARKGRAY)
+
+            end_drawing()
+            return
 
         if self.is_colliding:
-            if not self.explosion_playing:
-                play_sound(self.explosion)  # Plays the sound effect
-                self.explosion_playing = True
-    
             t = "COLLISION DETECTED!"
             text_size = measure_text(t, 24)
             draw_text(t, int((get_screen_width() - text_size)/2), 50, 24, RED)
-        else:
-            self.explosion_playing = False
             
-        # Draw players at their bounding box X and Y positions with the dynamic tint
-        self.player1.draw()
-        self.player2.draw()
-
         # Bullets
         for bullet in self.bullets:
             bullet.draw()
+
+        # Draw players at their bounding box X and Y positions with the dynamic tint
+        for player in self.players:
+            player.draw()
+
 
         end_drawing()
 
@@ -226,9 +299,9 @@ class App:
         self.init()
 
         # Main Game Loop
-        while not window_should_close():
+        while not window_should_close() and self.play:
             # Movement speed
-            self.speed =  10 * get_frame_time()
+            self.speed =  SPEED * get_frame_time()
             self.input()
             self.process()
             self.render()
