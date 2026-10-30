@@ -91,6 +91,18 @@ class App:
     def input(self):
         # --- 1. KEYBOARD INPUT & MOVEMENT ---
 
+        # Fullscreen Toggle using F Key
+        if is_key_pressed(KEY_F):
+            if is_window_fullscreen():
+                # Returning to windowed mode: restore original project resolution
+                toggle_fullscreen()
+                set_window_size(1024, 768)
+            else:
+                # Entering fullscreen: query active display size first to avoid distortion
+                monitor = get_current_monitor()
+                set_window_size(get_monitor_width(monitor), get_monitor_height(monitor))
+                toggle_fullscreen()
+
         if self.game_over:
             if is_key_pressed(KEY_SPACE): 
                 self.play = False
@@ -191,7 +203,7 @@ class App:
             i = 0 #player index
             for player in self.players:
                 if bullet.shooter == i:
-                    i =+ 1
+                    i += 1
                     continue
                 if check_collision_circle_rec((bullet.x, bullet.y),
                                               float(bullet.radius),
@@ -257,6 +269,7 @@ class App:
         draw_fps(10, 70)
 
         if self.game_over:
+            draw_rectangle(0, 0, get_screen_width(), get_screen_height(), fade(BLACK, 0.5))
             t = "GAME OVER"
             text_size = measure_text(t, 40)
             text_y = int(get_screen_height()/2) - 60
@@ -267,13 +280,13 @@ class App:
                     t = player.name + " wins !"
                     text_size = measure_text(t, 20)
                     text_y += 60
-                    draw_text(t, int((get_screen_width() - text_size)/2), text_y, 20, DARKGRAY)
+                    draw_text(t, int((get_screen_width() - text_size)/2), text_y, 20, WHITE)
                     break
 
-            t = "Press SPACE to exit"
+            t = "Press SPACE to restart"
             text_size = measure_text(t, 20)
             text_y += 40
-            draw_text(t, int((get_screen_width() - text_size)/2), text_y, 20, DARKGRAY)
+            draw_text(t, int((get_screen_width() - text_size)/2), text_y, 20, WHITE)
 
             end_drawing()
             return
