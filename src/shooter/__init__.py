@@ -3,7 +3,9 @@ import math
 import sys
 
 SPEED = 200
+COLLISION_DAMAGE = 5
 BULLET_DAMAGE = 5
+HEALTH_MAX = 100
 
 class Player:
 
@@ -15,7 +17,7 @@ class Player:
         self.width = self.texture.width
         self.height = self.texture.height
         self.name = name
-        self.health = 100
+        self.health = HEALTH_MAX
         self.hit = False
         self.hit_timer = 0
         self.tint_color = WHITE
@@ -62,6 +64,8 @@ class App:
     #    set_config_flags(ConfigFlags.FLAG_FULLSCREEN_MODE)
         init_window(1024, 768, "Shooter")
 
+        hide_cursor()
+
         set_target_fps(60)
 
         # Players init
@@ -86,9 +90,8 @@ class App:
         self.explosion = load_sound("assets/explosion.mp3")
         self.shot = load_sound("assets/shot.mp3")
         self.game_over = False
-        self.play = True
 
-    def input(self):
+    def handle_input(self):
         # --- 1. KEYBOARD INPUT & MOVEMENT ---
 
         # Fullscreen Toggle using F Key
@@ -104,8 +107,20 @@ class App:
                 toggle_fullscreen()
 
         if self.game_over:
-            if is_key_pressed(KEY_SPACE): 
-                self.play = False
+            if is_key_pressed(KEY_SPACE):
+                self.players[0].x = 0
+                self.players[0].y = float(get_screen_height() - self.players[0].height)
+
+                self.players[1].x = float(get_screen_width() - self.players[1].width)
+                self.players[1].y = float(get_screen_height() - self.players[1].height)
+
+                for player in self.players:
+                    player.angle = 0
+                    player.health = HEALTH_MAX
+
+                self.bullets = []
+
+                self.game_over = False
             return
 
         # player1 controls (W, A, S, D)
@@ -181,6 +196,12 @@ class App:
         if check_collision_recs(rec1, rec2):
             if not self.is_colliding:
                 play_sound(self.explosion)  # Plays the sound effect
+                for player in self.players:
+                    player.health -= COLLISION_DAMAGE
+                    if player.health <= 0:
+                        player.health = 0
+                        self.game_over = True
+
                 self.is_colliding = True
         else:
             self.is_colliding = False
@@ -312,10 +333,10 @@ class App:
         self.init()
 
         # Main Game Loop
-        while not window_should_close() and self.play:
+        while not window_should_close():
             # Movement speed
             self.speed =  SPEED * get_frame_time()
-            self.input()
+            self.handle_input()
             self.process()
             self.render()
             update_music_stream(self.bg_music)
