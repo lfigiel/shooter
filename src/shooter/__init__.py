@@ -95,7 +95,7 @@ class App:
         # --- 1. KEYBOARD INPUT & MOVEMENT ---
 
         # Fullscreen Toggle using F Key
-        if is_key_pressed(KEY_F):
+        if is_key_down(KEY_LEFT_SHIFT) and is_key_pressed(KEY_F):
             if is_window_fullscreen():
                 # Returning to windowed mode: restore original project resolution
                 toggle_fullscreen()
