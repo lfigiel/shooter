@@ -1,14 +1,14 @@
 [project]
 name = "shooter"
 version = "0.1.0"
-description = "Add your description here"
+description = "A local multiplayer raylib shooter game"
 readme = "README.md"
 authors = [
     { name = "Lukas", email = "lfigiel@gmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
-    "raylib>=6.0.1.0",
+    "raylib>=6.0.1.0"
 ]
 
 [project.scripts]

@@ -1,4 +1,5 @@
 from pyray import *
+import urllib.request
 import math
 import sys
 
@@ -6,6 +7,7 @@ SPEED = 200
 COLLISION_DAMAGE = 5
 BULLET_DAMAGE = 5
 HEALTH_MAX = 100
+FIRE_RATE = 0.1
 
 class Player:
 
@@ -21,6 +23,7 @@ class Player:
         self.hit = False
         self.hit_timer = 0
         self.tint_color = WHITE
+        self.gun_cooldown = get_time()
 
     def __del__(self):
         # This acts as the destructor
@@ -64,13 +67,29 @@ class App:
     #    set_config_flags(ConfigFlags.FLAG_FULLSCREEN_MODE)
         init_window(1024, 768, "Shooter")
 
+        # Download the latest community controller mappings
+        url = (
+            "https://raw.githubusercontent.com/"
+            "mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt"
+        )
+
+        try:
+            with urllib.request.urlopen(url, timeout=10) as response:
+                mappings = response.read().decode("utf-8")
+
+            result = set_gamepad_mappings(mappings)
+            print("Gamepad mappings loaded:", result)
+
+        except Exception as e:
+            print("Could not load gamepad mappings:", e)
+
         hide_cursor()
 
         set_target_fps(60)
 
         # Players init
         self.players = []
-        self.players.append(Player(0, 0, 0, "assets/ship1.png", self.player1_name))
+        self.players.append(Player(0, 0, 90, "assets/ship1.png", self.player1_name))
         self.players[0].y = float(get_screen_height() - self.players[0].height)
 
         self.players.append(Player(0, 0, 0, "assets/ship2.png", self.player2_name))
@@ -123,6 +142,44 @@ class App:
                 self.game_over = False
             return
 
+
+        gamepad_idx = 0
+        if is_gamepad_available(gamepad_idx):
+            # --- 1. JOYSTICK SIGNAL PROCESSING ---
+            # Standard structural axes mapping
+            lx = get_gamepad_axis_movement(gamepad_idx, GAMEPAD_AXIS_LEFT_X)
+            ly = get_gamepad_axis_movement(gamepad_idx, GAMEPAD_AXIS_LEFT_Y)
+#            rx = get_gamepad_axis_movement(gamepad_idx, GAMEPAD_AXIS_RIGHT_X)
+#            ry = get_gamepad_axis_movement(gamepad_idx, GAMEPAD_AXIS_RIGHT_Y)
+
+            button_id = GAMEPAD_BUTTON_RIGHT_TRIGGER_2
+            is_pressed = is_gamepad_button_down(gamepad_idx, button_id)
+            if is_pressed:
+                time_current = get_time()
+                if time_current >= self.players[0].gun_cooldown:
+                    self.bullets.append(Bullet(self.players[0].x + self.players[0].width/2,
+                                            self.players[0].y + self.players[0].height/2,
+                                            self.players[0].angle,
+                                            0))
+                    play_sound(self.shot)  # Plays the sound effect
+                    self.players[0].gun_cooldown = time_current + FIRE_RATE
+
+#            self.players[0].angle += lx * self.speed
+#            if self.players[0].angle < 0:
+#                self.players[0].angle += 360
+#            if self.players[0].angle > 360:
+#                self.players[0].angle = 0
+
+
+#            self.players[0].x -= math.sin(math.radians(self.players[0].angle)) * ry * 2 * self.speed
+#            self.players[0].y += math.cos(math.radians(self.players[0].angle)) * ry * 2 * self.speed
+#            self.players[0].x += math.sin(math.radians(self.players[0].angle+90)) * rx * 2 * self.speed
+#            self.players[0].y -= math.cos(math.radians(self.players[0].angle+90)) * rx * 2 * self.speed
+
+            self.players[0].x += lx * 2 * self.speed
+            self.players[0].y += ly * 2 * self.speed
+
+
         # player1 controls (W, A, S, D)
         if is_key_down(KEY_W): 
             pass
@@ -172,11 +229,11 @@ class App:
         if self.game_over:
             return
 
-        self.players[0].x += math.sin(math.radians(self.players[0].angle)) * self.speed
+#        self.players[0].x += math.sin(math.radians(self.players[0].angle)) * self.speed
         self.players[0].x = max(self.players[0].x, 0)
         self.players[0].x = min(self.players[0].x, get_screen_width() - self.players[0].width)
 
-        self.players[0].y -= math.cos(math.radians(self.players[0].angle)) * self.speed
+#        self.players[0].y -= math.cos(math.radians(self.players[0].angle)) * self.speed
         self.players[0].y = max(self.players[0].y, 0)
         self.players[0].y = min(self.players[0].y, get_screen_height() - self.players[0].height)
 
